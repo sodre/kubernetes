@@ -87,6 +87,21 @@ func TestReadAWSCloudConfig(t *testing.T) {
 			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
 			false, "eu-west-1a",
 		},
+        {
+            "Custom Zone and strict check in config, no metadata",
+            strings.NewReader("[global]\nzone = us-custom-1a"), nil,
+            false, "",
+        },
+        {
+            "Custom Zone and disable check in config, no metadata",
+            strings.NewReader("[global]\nzone = us-custom-1a\nDisableStrictZoneCheck = true"), nil,
+            true, "us-custom-1a"
+        },
+        {
+            "No zone in config, metadata has custom zone",
+            strings.NewReader(""), NewFakeAWSServices().withAz("us-custom-1a"),
+            true, "us-custom-1a"
+        },
 	}
 
 	for _, test := range tests {
@@ -199,11 +214,22 @@ func TestNewAWSCloud(t *testing.T) {
 			strings.NewReader("[global]\nzone = eu-west-1a"), NewFakeAWSServices(),
 			false, "eu-west-1",
 		},
+        {
+			"Config specifies custom zone",
+			strings.NewReader("[global]\nzone = us-custom-1a\nDisableStrictZoneCheck = true"), NewFakeAWSServices(),
+			false, "us-custom-1",
+		},
 		{
 			"Gets zone from metadata when not in config",
 			strings.NewReader("[global]\n"),
 			NewFakeAWSServices(),
 			false, "us-east-1",
+		},
+        {
+			"Gets custom zone from metadata when not in config",
+			strings.NewReader("[global]\nDisableStrictZoneCheck = true"),
+			NewFakeAWSServices().withAz("us-custom-1a"),
+			false, "us-custom-1",
 		},
 		{
 			"No zone in config or metadata",
