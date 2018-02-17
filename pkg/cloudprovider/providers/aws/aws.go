@@ -199,9 +199,9 @@ var once sync.Once
 
 // Services is an abstraction over AWS, to allow mocking/other implementations
 type Services interface {
-	Compute(region string) (EC2, error)
-	LoadBalancing(region string) (ELB, error)
-	Autoscaling(region string) (ASG, error)
+	Compute(region string, endpoint string) (EC2, error)
+	LoadBalancing(region string, endpoint string) (ELB, error)
+	Autoscaling(region string, endpoint string) (ASG, error)
 	Metadata() (EC2Metadata, error)
 }
 
@@ -440,6 +440,16 @@ type CloudConfig struct {
 		//yourself in an non-AWS cloud and open an issue, please indicate that in the
 		//issue body.
 		DisableStrictZoneCheck bool
+
+		//In a non-standard, AWS like environment (e.g. Eucalyptus), we need to specify
+		//custom endpoints for the services we are leveraging (e.g. ec2, ELB, etc)
+
+		//EC2Endpoint is an optional endpoint URL for non-standard AWS-like environments.
+		EC2Endpoint string
+		//ELBEndpoint is an optional endpoint URL for non-standard AWS-like environments
+		ELBEndpoint string
+		//ASGEndpoint is an optional endpoint URL for non-standard AWS-like environments
+		ASGEndpoint string
 	}
 }
 
@@ -503,10 +513,11 @@ func (p *awsSDKProvider) getCrossRequestRetryDelay(regionName string) *CrossRequ
 	return delayer
 }
 
-func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
+func (p *awsSDKProvider) Compute(regionName string, endpoint string) (EC2, error) {
 	service := ec2.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
+		Endpoint:    &endpoint,
 	}))
 
 	p.addHandlers(regionName, &service.Handlers)
@@ -517,10 +528,11 @@ func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
 	return ec2, nil
 }
 
-func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
+func (p *awsSDKProvider) LoadBalancing(regionName string, endpoint string) (ELB, error) {
 	elbClient := elb.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
+		Endpoint:    &endpoint,
 	}))
 
 	p.addHandlers(regionName, &elbClient.Handlers)
@@ -528,10 +540,11 @@ func (p *awsSDKProvider) LoadBalancing(regionName string) (ELB, error) {
 	return elbClient, nil
 }
 
-func (p *awsSDKProvider) Autoscaling(regionName string) (ASG, error) {
+func (p *awsSDKProvider) Autoscaling(regionName string, endpoint string) (ASG, error) {
 	client := autoscaling.New(session.New(&aws.Config{
 		Region:      &regionName,
 		Credentials: p.creds,
+		Endpoint:    &endpoint,
 	}))
 
 	p.addHandlers(regionName, &client.Handlers)
@@ -838,17 +851,17 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 		glog.Warningf("Strict AWS zone checking is disabled.  Proceeding with zone: %s", zone)
 	}
 
-	ec2, err := awsServices.Compute(regionName)
+	ec2, err := awsServices.Compute(regionName, cfg.Global.EC2Endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error creating AWS EC2 client: %v", err)
 	}
 
-	elb, err := awsServices.LoadBalancing(regionName)
+	elb, err := awsServices.LoadBalancing(regionName, cfg.Global.ELBEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error creating AWS ELB client: %v", err)
 	}
 
-	asg, err := awsServices.Autoscaling(regionName)
+	asg, err := awsServices.Autoscaling(regionName, cfg.Global.ASGEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("error creating AWS autoscaling client: %v", err)
 	}
