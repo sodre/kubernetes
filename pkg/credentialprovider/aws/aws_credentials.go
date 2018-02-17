@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 )
 
+// TODO: This should be configurable for custom AWS services
 const registryURLTemplate = "*.dkr.ecr.%s.amazonaws.com"
 
 // awsHandlerLogger is a handler that logs all AWS SDK requests
